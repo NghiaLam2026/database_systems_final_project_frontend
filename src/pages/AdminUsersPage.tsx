@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api/client'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +10,11 @@ import { listUsers, createUser, changeUserRole } from '@/features/users/users.ap
 import type { Role, UserOut } from '@/features/auth/auth.types'
 
 const PAGE_SIZE = 20
+
+const rowVariant = {
+  hidden: { opacity: 0, x: -8 },
+  visible: { opacity: 1, x: 0 },
+}
 
 export function AdminUsersPage() {
   const { state } = useAuth()
@@ -44,15 +50,26 @@ export function AdminUsersPage() {
       {usersQuery.isPending ? (
         <div className="mt-6 space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-12 animate-pulse rounded-xl bg-mist-100" />
+            <motion.div
+              key={i}
+              className="h-12 rounded-xl bg-mist-100"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.4, 0.7, 0.4] }}
+              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.08 }}
+            />
           ))}
         </div>
       ) : usersQuery.isError ? (
-        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <motion.div
+          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           {usersQuery.error instanceof ApiError
             ? usersQuery.error.message
             : 'Failed to load users.'}
-        </div>
+        </motion.div>
       ) : data ? (
         <>
           <div className="mt-6 overflow-hidden rounded-xl border border-mist-200">
@@ -66,7 +83,11 @@ export function AdminUsersPage() {
                   <th className="px-4 py-3 text-right font-medium text-ink-800">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <motion.tbody
+                initial="hidden"
+                animate="visible"
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}
+              >
                 {data.items.map((user) => (
                   <UserRow
                     key={user.id}
@@ -81,7 +102,7 @@ export function AdminUsersPage() {
                     }}
                   />
                 ))}
-              </tbody>
+              </motion.tbody>
             </table>
           </div>
 
@@ -133,7 +154,11 @@ function UserRow({
   const isSelf = state.status === 'authenticated' && state.user.id === user.id
 
   return (
-    <tr className="border-b border-mist-100 last:border-b-0">
+    <motion.tr
+      className="border-b border-mist-100 last:border-b-0"
+      variants={rowVariant}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+    >
       <td className="px-4 py-3 text-ink-950">
         {user.first_name} {user.last_name}
       </td>
@@ -166,7 +191,7 @@ function UserRow({
           </Button>
         )}
       </td>
-    </tr>
+    </motion.tr>
   )
 }
 
@@ -268,8 +293,8 @@ function CreateUserModal({
                   onClick={() => setRole(r)}
                   className={
                     role === r
-                      ? 'rounded-lg border border-brand-300 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700'
-                      : 'rounded-lg border border-mist-200 bg-white px-3 py-2 text-sm text-ink-800 hover:bg-mist-50'
+                      ? 'rounded-lg border border-brand-300 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 transition-colors duration-150'
+                      : 'rounded-lg border border-mist-200 bg-white px-3 py-2 text-sm text-ink-800 transition-colors duration-150 hover:bg-mist-50'
                   }
                 >
                   {r}
@@ -279,9 +304,15 @@ function CreateUserModal({
           </div>
 
           {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            <motion.div
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+              role="alert"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.25 }}
+            >
               {error}
-            </div>
+            </motion.div>
           ) : null}
 
           <div className="flex justify-end gap-2 pt-2">

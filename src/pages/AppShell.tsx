@@ -1,16 +1,29 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { TopNav } from '@/components/layout/TopNav'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils/cn'
 
+const pageVariants = {
+  initial: { opacity: 0, y: 8 },
+  enter: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -6 },
+}
+
 export function AppShell() {
   const { state } = useAuth()
+  const location = useLocation()
 
   return (
     <div className="min-h-screen bg-hero">
       <TopNav />
       <div className="mx-auto grid max-w-6xl gap-6 px-6 py-8 md:grid-cols-[220px_1fr]">
-        <aside className="rounded-xl2 border border-white/70 bg-white/55 p-3 shadow-soft backdrop-blur">
+        <motion.aside
+          className="rounded-xl2 border border-white/70 bg-white/55 p-3 shadow-soft backdrop-blur"
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ type: 'spring', duration: 0.45, bounce: 0.15 }}
+        >
           <div className="px-3 pb-3 text-xs font-semibold text-ink-800">Workspace</div>
           <nav className="space-y-1 text-sm">
             <SideLink to="/app" end>
@@ -25,10 +38,21 @@ export function AppShell() {
               </>
             ) : null}
           </nav>
-        </aside>
+        </motion.aside>
 
         <main className="rounded-xl2 border border-white/70 bg-white/55 p-6 shadow-soft backdrop-blur">
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              variants={pageVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>
@@ -42,8 +66,8 @@ function SideLink({ to, end, children }: { to: string; end?: boolean; children: 
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex rounded-lg px-3 py-2 text-ink-900 hover:bg-white/60',
-          isActive && 'bg-white/80 font-semibold',
+          'flex rounded-lg px-3 py-2 text-ink-900 transition-colors duration-150 hover:bg-white/60',
+          isActive && 'bg-white/80 font-semibold shadow-sm',
         )
       }
     >

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Cpu, ShieldCheck, Sparkles } from 'lucide-react'
 import { TopNav } from '@/components/layout/TopNav'
 import { Modal } from '@/components/ui/Modal'
@@ -11,6 +12,23 @@ import { ApiError } from '@/lib/api/client'
 import { safePostLoginPath } from '@/lib/utils/safeRedirect'
 
 type Mode = 'login' | 'register'
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+}
+
+const staggerContainer = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.1 },
+  },
+}
+
+const cardVariant = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { type: 'spring' as const, duration: 0.5, bounce: 0.2 } },
+}
 
 export function LandingPage() {
   const location = useLocation()
@@ -100,16 +118,33 @@ export function LandingPage() {
       <TopNav onLoginClick={() => setOpen(true)} />
 
       <main className="mx-auto max-w-6xl px-6 pb-16 pt-14">
-        <div className="text-center">
-          <h1 className="mx-auto max-w-2xl text-balance text-4xl font-semibold tracking-tight text-ink-950 sm:text-5xl">
+        <motion.div
+          className="text-center"
+          initial="hidden"
+          animate="visible"
+          variants={staggerContainer}
+        >
+          <motion.h1
+            className="mx-auto max-w-2xl text-balance text-4xl font-semibold tracking-tight text-ink-950 sm:text-5xl"
+            variants={fadeUp}
+            transition={{ duration: 0.5 }}
+          >
             One <span className="text-brand-600">Build</span> for all your PC needs
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-6 text-ink-800">
+          </motion.h1>
+          <motion.p
+            className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-6 text-ink-800"
+            variants={fadeUp}
+            transition={{ duration: 0.5 }}
+          >
             Create and manage builds, browse parts, and get compatibility-aware help. Fast, simple, and designed to feel
             premium.
-          </p>
+          </motion.p>
 
-          <div className="mt-8 flex justify-center gap-3">
+          <motion.div
+            className="mt-8 flex justify-center gap-3"
+            variants={fadeUp}
+            transition={{ duration: 0.5 }}
+          >
             {state.status === 'authenticated' ? (
               <Link to="/app">
                 <Button variant="secondary">Go to dashboard</Button>
@@ -122,26 +157,34 @@ export function LandingPage() {
                 Browse catalog
               </Button>
             </Link>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <section className="mt-12 grid gap-4 sm:grid-cols-3">
+        <motion.section
+          className="mt-24 grid gap-4 sm:grid-cols-3"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: {},
+            visible: { transition: { staggerChildren: 0.12, delayChildren: 0.35 } },
+          }}
+        >
           <FeatureCard
             icon={<Cpu className="h-5 w-5 text-brand-600" />}
-            title="General"
-            body="Build a workspace for your parts, budget, and upgrades."
+            title="Browse"
+            body="Explore a full catalog of PC parts — CPUs, GPUs, RAM, and more — all in one place."
           />
           <FeatureCard
             icon={<ShieldCheck className="h-5 w-5 text-brand-600" />}
-            title="Manage"
-            body="Secure accounts, role-based access, and clean audit-friendly soft deletes."
+            title="Plan"
+            body="Create builds, track compatibility, and manage your component list with ease."
           />
           <FeatureCard
             icon={<Sparkles className="h-5 w-5 text-brand-600" />}
-            title="Connect"
-            body="Chat is wired end-to-end today; AI orchestration can plug in later."
+            title="Ask"
+            body="Chat with an AI assistant that queries parts data, understands intent, and answers build questions."
           />
-        </section>
+        </motion.section>
       </main>
 
       <Modal open={open} title={mode === 'login' ? 'Account Log In' : 'Create Account'} onClose={onClose}>
@@ -193,18 +236,27 @@ export function LandingPage() {
             />
 
             {success ? (
-              <div
+              <motion.div
                 className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
                 role="status"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                transition={{ duration: 0.25 }}
               >
                 {success}
-              </div>
+              </motion.div>
             ) : null}
 
             {error ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+              <motion.div
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                role="alert"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                transition={{ duration: 0.25 }}
+              >
                 {error}
-              </div>
+              </motion.div>
             ) : null}
 
             <div className="pt-2">
@@ -241,12 +293,16 @@ export function LandingPage() {
 
 function FeatureCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
   return (
-    <div className="rounded-xl2 border border-white/70 bg-white/55 p-6 shadow-soft backdrop-blur">
+    <motion.div
+      className="rounded-xl2 border border-white/70 bg-white/55 p-6 shadow-soft backdrop-blur"
+      variants={cardVariant}
+      whileHover={{ y: -4, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+    >
       <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm">{icon}</div>
       <div className="text-left">
         <div className="text-sm font-semibold text-ink-950">{title}</div>
         <div className="mt-1 text-sm leading-6 text-ink-800">{body}</div>
       </div>
-    </div>
+    </motion.div>
   )
 }
