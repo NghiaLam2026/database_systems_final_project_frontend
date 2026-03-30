@@ -31,6 +31,7 @@ export function LandingPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const canSubmit = useMemo(() => {
@@ -39,15 +40,30 @@ export function LandingPage() {
     return true
   }, [email, firstName, lastName, mode, password])
 
+  const resetForm = () => {
+    setPassword('')
+    setFirstName('')
+    setLastName('')
+    setError(null)
+    setSuccess(null)
+  }
+
+  const switchMode = (next: Mode) => {
+    setMode(next)
+    resetForm()
+  }
+
   const onClose = () => {
     setOpen(false)
-    setError(null)
+    resetForm()
+    setEmail('')
     navigate('/', { replace: true, state: {} })
   }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setBusy(true)
     try {
       if (mode === 'register') {
@@ -57,12 +73,19 @@ export function LandingPage() {
           first_name: firstName,
           last_name: lastName,
         })
+        setPassword('')
+        setFirstName('')
+        setLastName('')
+        setSuccess('Account created! Please log in.')
+        setMode('login')
+      } else {
+        await login(email.trim(), password)
+        setOpen(false)
+        resetForm()
+        setEmail('')
+        const next = safePostLoginPath(authLocationState?.from)
+        navigate(next, { replace: true, state: {} })
       }
-      await login(email.trim(), password)
-      setOpen(false)
-      setError(null)
-      const next = safePostLoginPath(authLocationState?.from)
-      navigate(next, { replace: true, state: {} })
     } catch (err) {
       if (err instanceof ApiError) setError(err.message)
       else if (err instanceof Error) setError(err.message)
@@ -169,6 +192,15 @@ export function LandingPage() {
               name="password"
             />
 
+            {success ? (
+              <div
+                className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                role="status"
+              >
+                {success}
+              </div>
+            ) : null}
+
             {error ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
                 {error}
@@ -189,36 +221,18 @@ export function LandingPage() {
           </form>
 
           <div className="mt-4 flex items-center justify-between text-xs">
-            <button className="text-brand-600 hover:underline" type="button" onClick={() => setMode('login')}>
+            <button className="text-brand-600 hover:underline" type="button" onClick={() => switchMode('login')}>
               Having problems?
             </button>
             <button
               className="text-brand-600 hover:underline"
               type="button"
-              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+              onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
             >
               {mode === 'login' ? 'Register Now' : 'Back to Log In'}
             </button>
           </div>
 
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-mist-200" />
-            <div className="text-[11px] text-ink-800/70">More Login Methods</div>
-            <div className="h-px flex-1 bg-mist-200" />
-          </div>
-
-          <div className="flex justify-center gap-3">
-            {['G', '', 'f', 'X', 'PS'].map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-mist-200 bg-white text-sm text-ink-900 shadow-sm hover:bg-mist-50"
-                aria-label={`Login method ${t}`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
         </div>
       </Modal>
     </div>

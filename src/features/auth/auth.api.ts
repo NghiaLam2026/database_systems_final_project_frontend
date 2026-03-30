@@ -1,5 +1,5 @@
 import { apiRequest } from '@/lib/api/client'
-import { tokenSchema, userOutSchema } from './auth.types'
+import { loginResponseSchema, userOutSchema } from './auth.types'
 
 export function register(payload: {
   email: string
@@ -18,7 +18,7 @@ export function login(payload: { email: string; password: string }) {
   return apiRequest('/api/v1/auth/login', {
     method: 'POST',
     body: payload,
-    schema: tokenSchema,
+    schema: loginResponseSchema,
   })
 }
 

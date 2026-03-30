@@ -53,19 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await loginApi({ email, password })
       setToken(res.access_token)
       setTokenState(res.access_token)
-      // Populate cache for the new query key before the next render so `/me` never runs with a stale token.
-      await qc.fetchQuery({
-        queryKey: ['auth', 'me', res.access_token],
-        queryFn: () => meApi(res.access_token),
-      })
+      qc.setQueryData(['auth', 'me', res.access_token], res.user)
     },
     [qc],
   )
 
-  /**
-   * JWT exp is client-trusted for UX only; when it lapses during a session, clear react state/storage.
-   * Deferred with a microtask to avoid synchronous setState-in-effect lint issues while keeping behavior deterministic.
-   */
   useEffect(() => {
     if (!token) return
     if (!isTokenExpired(token)) return
@@ -76,7 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [qc, token])
 
-  /** Revoked or invalid token from API: clear client session (same microtask pattern as above). */
   useEffect(() => {
     if (!meQuery.isError || !meQuery.error) return
     if (meQuery.error instanceof ApiError && (meQuery.error.status === 401 || meQuery.error.status === 403)) {
@@ -84,7 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [logout, meQuery.error, meQuery.isError])
 
-  /** Log out in this tab when another tab clears the token; pick up login from another tab. */
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== AUTH_TOKEN_STORAGE_KEY) return

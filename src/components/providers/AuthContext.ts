@@ -1,9 +1,9 @@
 import { createContext } from 'react'
-import type { UserOut } from '@/features/auth/auth.types'
+import type { User } from '@/features/auth/auth.types'
 
 export type AuthState =
   | { status: 'anonymous'; token: null; user: null }
-  | { status: 'authenticated'; token: string; user: UserOut }
+  | { status: 'authenticated'; token: string; user: User }
   | { status: 'loading'; token: string; user: null }
   | { status: 'profile_error'; token: string; user: null }
 
