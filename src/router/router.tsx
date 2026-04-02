@@ -3,6 +3,7 @@ import { ErrorPage } from '@/pages/errors/ErrorPage'
 import { LandingPage } from '@/pages/LandingPage'
 import { AppShell } from '@/pages/AppShell'
 import { BuildsPage } from '@/pages/BuildsPage'
+import { BuilderPage } from '@/pages/BuilderPage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { ChatPage } from '@/pages/ChatPage'
 import { AdminUsersPage } from '@/pages/AdminUsersPage'
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <BuildsPage /> },
+          { path: 'builds/:id', element: <BuilderPage /> },
           { path: 'catalog', element: <CatalogPage /> },
           { path: 'chat', element: <ChatPage /> },
           {

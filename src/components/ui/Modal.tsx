@@ -7,11 +7,13 @@ export function Modal({
   title,
   onClose,
   children,
+  size = 'md',
 }: {
   open: boolean
   title?: string
   onClose: () => void
   children: React.ReactNode
+  size?: 'md' | 'lg' | 'xl'
 }) {
   useEffect(() => {
     if (!open) return
@@ -41,7 +43,10 @@ export function Modal({
             aria-modal="true"
             aria-label={title}
             className={cn(
-              'relative w-full max-w-md overflow-hidden rounded-xl2 border border-white/60 bg-white/85 shadow-card backdrop-blur',
+              'relative w-full overflow-hidden rounded-xl2 border border-white/60 bg-white/85 shadow-card backdrop-blur',
+              size === 'md' && 'max-w-md',
+              size === 'lg' && 'max-w-2xl',
+              size === 'xl' && 'max-w-5xl',
             )}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
