@@ -6,6 +6,10 @@ import { AuthProvider } from './components/providers/AuthProvider'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // React Strict Mode remounts components twice in dev; staleTime > 0 keeps the first
+      // successful fetch "fresh" so the second mount reuses cache instead of firing again.
+      staleTime: 30 * 1000,
+      gcTime: 5 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
     },

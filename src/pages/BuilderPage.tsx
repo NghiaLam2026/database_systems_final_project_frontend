@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -322,10 +322,10 @@ function PartSlot({
   return (
     <motion.div
       className={cn(
-        'rounded-xl border p-4 transition-colors',
+        'rounded-2xl border p-5 transition-all duration-200',
         isEmpty
           ? 'border-dashed border-mist-300 bg-white/40'
-          : 'border-mist-200 bg-white/70',
+          : 'border-mist-200 bg-white shadow-sm hover:shadow-card',
       )}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -462,6 +462,7 @@ function CatalogPickerModal({
     queryKey: ['catalog-picker', category, queryParams],
     queryFn: () => listCatalog(category, queryParams),
     enabled: open && !!partType,
+    placeholderData: keepPreviousData,
   })
 
   const data = catalogQuery.data

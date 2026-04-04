@@ -72,15 +72,15 @@ export function AdminUsersPage() {
         </motion.div>
       ) : data ? (
         <>
-          <div className="mt-6 overflow-hidden rounded-xl border border-mist-200">
+          <div className="mt-8 overflow-hidden rounded-2xl border border-mist-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-mist-200 bg-mist-50/60">
-                  <th className="px-4 py-3 font-medium text-ink-800">Name</th>
-                  <th className="px-4 py-3 font-medium text-ink-800">Email</th>
-                  <th className="px-4 py-3 font-medium text-ink-800">Role</th>
-                  <th className="px-4 py-3 font-medium text-ink-800">Joined</th>
-                  <th className="px-4 py-3 text-right font-medium text-ink-800">Actions</th>
+                <tr className="border-b border-mist-200 bg-mist-50/50">
+                  <th className="px-5 py-4 font-medium text-ink-800">Name</th>
+                  <th className="px-5 py-4 font-medium text-ink-800">Email</th>
+                  <th className="px-5 py-4 font-medium text-ink-800">Role</th>
+                  <th className="px-5 py-4 font-medium text-ink-800">Joined</th>
+                  <th className="px-5 py-4 text-right font-medium text-ink-800">Actions</th>
                 </tr>
               </thead>
               <motion.tbody
@@ -155,29 +155,29 @@ function UserRow({
 
   return (
     <motion.tr
-      className="border-b border-mist-100 last:border-b-0"
+      className="border-b border-mist-100 transition-colors last:border-b-0 hover:bg-mist-50/50"
       variants={rowVariant}
       transition={{ duration: 0.25, ease: 'easeOut' }}
     >
-      <td className="px-4 py-3 text-ink-950">
+      <td className="px-5 py-4 text-ink-950">
         {user.first_name} {user.last_name}
       </td>
-      <td className="px-4 py-3 text-ink-800">{user.email}</td>
-      <td className="px-4 py-3">
+      <td className="px-5 py-4 text-ink-800">{user.email}</td>
+      <td className="px-5 py-4">
         <span
           className={
             user.role === 'admin'
-              ? 'inline-block rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700'
-              : 'inline-block rounded-full bg-mist-100 px-2.5 py-0.5 text-xs font-medium text-ink-800'
+              ? 'inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-700'
+              : 'inline-flex items-center rounded-full bg-mist-100 px-2.5 py-0.5 text-xs font-semibold text-ink-800'
           }
         >
           {user.role}
         </span>
       </td>
-      <td className="px-4 py-3 text-ink-800">
+      <td className="px-5 py-4 text-ink-800">
         {new Date(user.created_at).toLocaleDateString()}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-5 py-4 text-right">
         {isSelf ? (
           <span className="text-xs text-ink-800/50">You</span>
         ) : (

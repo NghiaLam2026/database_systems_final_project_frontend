@@ -6,8 +6,8 @@ export function TopNav({ onLoginClick }: { onLoginClick?: () => void }) {
   const { state, logout } = useAuth()
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/40 bg-white/30 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <header className="sticky top-0 z-30 border-b border-mist-200 bg-white/80 backdrop-blur-xl">
+      <div className="flex w-full items-center justify-between px-6 py-4 md:px-8">
         <Link to="/" className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-ink-950 text-sm font-semibold text-white shadow-soft">
             PC
@@ -15,13 +15,15 @@ export function TopNav({ onLoginClick }: { onLoginClick?: () => void }) {
           <span className="text-sm font-semibold tracking-tight text-ink-950">PC Build Assistant</span>
         </Link>
 
-        <nav className="flex items-center gap-2 text-sm text-ink-900">
-          <Link className="rounded-lg px-3 py-2 hover:bg-white/50" to="/app">
-            Dashboard
-          </Link>
-          <Link className="rounded-lg px-3 py-2 hover:bg-white/50" to="/app/catalog">
-            Catalog
-          </Link>
+        <nav className="flex items-center gap-2 text-sm font-medium text-ink-900">
+          <div className="hidden items-center gap-1 md:flex">
+            <Link className="rounded-xl px-3 py-2 transition-colors hover:bg-mist-100/80" to="/app">
+              Dashboard
+            </Link>
+            <Link className="rounded-xl px-3 py-2 transition-colors hover:bg-mist-100/80" to="/app/catalog">
+              Catalog
+            </Link>
+          </div>
 
           {state.status === 'authenticated' ? (
             <>

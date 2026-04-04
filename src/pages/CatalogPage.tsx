@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronUp, ChevronDown, Search, X } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
@@ -57,6 +57,7 @@ export function CatalogPage() {
   const catalogQuery = useQuery({
     queryKey: ['catalog', category, queryParams],
     queryFn: () => listCatalog(category, queryParams),
+    placeholderData: keepPreviousData,
   })
 
   const columns = CATEGORY_COLUMNS[category]
@@ -199,10 +200,10 @@ export function CatalogPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <div className="overflow-x-auto rounded-xl border border-mist-200">
+              <div className="overflow-x-auto rounded-2xl border border-mist-200 bg-white shadow-sm">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-mist-200 bg-mist-50/60">
+                    <tr className="border-b border-mist-200 bg-mist-50/50">
                       {columns.map((col) => (
                         <SortableHeader
                           key={col.key}
@@ -222,7 +223,7 @@ export function CatalogPage() {
                     {data.items.map((item) => (
                       <motion.tr
                         key={item.id}
-                        className="cursor-pointer border-b border-mist-100 transition-colors last:border-b-0 hover:bg-white/70"
+                        className="cursor-pointer border-b border-mist-100 transition-colors last:border-b-0 hover:bg-mist-50/50"
                         variants={{
                           hidden: { opacity: 0, x: -6 },
                           visible: { opacity: 1, x: 0 },
@@ -231,7 +232,7 @@ export function CatalogPage() {
                         onClick={() => setDetailItem(item)}
                       >
                         {columns.map((col) => (
-                          <td key={col.key} className="whitespace-nowrap px-4 py-3 text-ink-900">
+                          <td key={col.key} className="whitespace-nowrap px-5 py-4 text-ink-900">
                             {col.format
                               ? col.format(item[col.key])
                               : item[col.key] != null
@@ -298,14 +299,14 @@ function SortableHeader({
 }) {
   if (!col.sortable) {
     return (
-      <th className="px-4 py-3 font-medium text-ink-800">{col.label}</th>
+      <th className="px-5 py-4 font-medium text-ink-800">{col.label}</th>
     )
   }
 
   return (
-    <th className="px-4 py-3 font-medium text-ink-800">
+    <th className="px-5 py-4 font-medium text-ink-800">
       <button
-        className="inline-flex items-center gap-1 hover:text-ink-950"
+        className="inline-flex items-center gap-1.5 hover:text-ink-950"
         onClick={() => onSort(col.key)}
       >
         {col.label}

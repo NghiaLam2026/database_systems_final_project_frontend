@@ -63,11 +63,11 @@ export function BuildsPage() {
       </div>
 
       {buildsQuery.isPending ? (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
             <motion.div
               key={i}
-              className="h-40 rounded-xl bg-mist-100"
+              className="h-44 rounded-2xl bg-mist-200/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0.4, 0.7, 0.4] }}
               transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.08 }}
@@ -101,7 +101,7 @@ export function BuildsPage() {
         </motion.div>
       ) : builds ? (
         <motion.div
-          className="mt-6 grid gap-4 sm:grid-cols-2"
+          className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           initial="hidden"
           animate="visible"
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
@@ -170,51 +170,59 @@ function BuildCard({
       }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="group cursor-pointer rounded-xl border border-mist-200 bg-white/70 p-5 shadow-sm transition-shadow hover:shadow-card"
+      className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-mist-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-card"
       onClick={onOpen}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-ink-950">
-            {build.build_name}
-          </h3>
-          {build.description ? (
-            <p className="mt-0.5 truncate text-sm text-ink-800/70">{build.description}</p>
-          ) : null}
-        </div>
-        <div className="text-right">
-          <span className="text-lg font-bold text-brand-600">{price}</span>
+      <div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-semibold tracking-tight text-ink-950">
+              {build.build_name}
+            </h3>
+            {build.description ? (
+              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-800/70">
+                {build.description}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-4 text-xs text-ink-800/60">
-        <span>{build.parts_count} {build.parts_count === 1 ? 'part' : 'parts'}</span>
-        <span>Updated {new Date(build.updated_at).toLocaleDateString()}</span>
-      </div>
+      <div className="mt-6">
+        <div className="flex items-end justify-between">
+          <div className="flex flex-col gap-1 text-xs font-medium text-ink-800/50">
+            <span>{build.parts_count} {build.parts_count === 1 ? 'part' : 'parts'}</span>
+            <span>Updated {new Date(build.updated_at).toLocaleDateString()}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-xl font-bold tracking-tight text-brand-600">{price}</span>
+          </div>
+        </div>
 
-      <div className="mt-4 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          title="Edit details"
-          onClick={(e) => { e.stopPropagation(); onEdit() }}
-          className="rounded-lg p-1.5 text-ink-800/50 hover:bg-mist-100 hover:text-ink-900"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          title="Clone build"
-          onClick={(e) => { e.stopPropagation(); onClone() }}
-          disabled={cloning}
-          className="rounded-lg p-1.5 text-ink-800/50 hover:bg-mist-100 hover:text-ink-900 disabled:opacity-40"
-        >
-          <Copy className="h-3.5 w-3.5" />
-        </button>
-        <button
-          title="Delete build"
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          className="rounded-lg p-1.5 text-ink-800/50 hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="absolute right-4 top-4 flex gap-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <button
+            title="Edit details"
+            onClick={(e) => { e.stopPropagation(); onEdit() }}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-mist-100/80 text-ink-800 transition-colors hover:bg-mist-200 hover:text-ink-950"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            title="Clone build"
+            onClick={(e) => { e.stopPropagation(); onClone() }}
+            disabled={cloning}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-mist-100/80 text-ink-800 transition-colors hover:bg-mist-200 hover:text-ink-950 disabled:opacity-40"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button
+            title="Delete build"
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 transition-colors hover:bg-red-100 hover:text-red-700"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </motion.div>
   )
