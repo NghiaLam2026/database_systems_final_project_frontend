@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { MessageSquarePlus, MoreHorizontal, Pencil, Trash2, Send } from 'lucide-react'
+import {
+  MessageSquarePlus,
+  MoreHorizontal,
+  Pencil,
+  Send,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils/cn'
@@ -10,6 +17,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { TextField } from '@/components/ui/TextField'
 import { listBuilds } from '@/features/builds/builds.api'
+import type { BuildSummary } from '@/features/builds/builds.types'
 import {
   createThread,
   deleteThread,
@@ -36,6 +44,9 @@ export function ChatPage() {
   const [renameValue, setRenameValue] = useState('')
   const [renameTargetId, setRenameTargetId] = useState<number | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null)
+  /** With no `?thread=`, start in new-chat draft; "New" sets this true; picking a thread clears it. */
+  const [wantsNewChatDraft, setWantsNewChatDraft] = useState(() => threadParam == null)
+  const isDraftNewChat = wantsNewChatDraft && validSelectedId == null
   const endRef = useRef<HTMLDivElement>(null)
 
   const threadsQuery = useQuery({
@@ -66,23 +77,46 @@ export function ChatPage() {
     void qc.invalidateQueries({ queryKey: ['threads'] })
   }, [qc])
 
-  const createMutation = useMutation({
-    mutationFn: () => createThread(token, {}),
-    onSuccess: (thread) => {
-      invalidateThreads()
-      setSearchParams({ thread: String(thread.id) })
-    },
-  })
+  const startDraftNewChat = useCallback(() => {
+    setWantsNewChatDraft(true)
+    setSearchParams({})
+    setDraft('')
+    setMenuOpenId(null)
+  }, [setSearchParams])
 
   const sendMutation = useMutation({
-    mutationFn: () =>
-      postMessage(token, validSelectedId!, {
+    mutationFn: async (): Promise<{ threadId: number; mode: 'new' | 'existing' }> => {
+      const body = {
         user_request: draft.trim(),
         ...(buildId !== '' ? { build_id: buildId } : {}),
-      }),
-    onSuccess: () => {
+      }
+      if (validSelectedId != null) {
+        await postMessage(token, validSelectedId, body)
+        return { threadId: validSelectedId, mode: 'existing' }
+      }
+      if (isDraftNewChat) {
+        const thread = await createThread(token, {})
+        try {
+          await postMessage(token, thread.id, body)
+          return { threadId: thread.id, mode: 'new' }
+        } catch (e) {
+          try {
+            await deleteThread(token, thread.id)
+          } catch {
+            /* ignore cleanup failure */
+          }
+          throw e
+        }
+      }
+      throw new Error('No chat selected')
+    },
+    onSuccess: (result) => {
       setDraft('')
-      void qc.invalidateQueries({ queryKey: ['messages', 'all', validSelectedId] })
+      if (result.mode === 'new') {
+        setWantsNewChatDraft(false)
+        setSearchParams({ thread: String(result.threadId) })
+      }
+      void qc.invalidateQueries({ queryKey: ['messages', 'all', result.threadId] })
       invalidateThreads()
     },
   })
@@ -133,6 +167,7 @@ export function ChatPage() {
   }
 
   const selectThread = (id: number) => {
+    setWantsNewChatDraft(false)
     setSearchParams({ thread: String(id) })
   }
 
@@ -144,6 +179,11 @@ export function ChatPage() {
     )
   }
 
+  const greetName =
+    state.status === 'authenticated' && state.user.first_name?.trim()
+      ? state.user.first_name.trim()
+      : 'there'
+
   return (
     <div className="flex min-h-[min(720px,calc(100dvh-10rem))] flex-col gap-4 lg:flex-row lg:gap-6">
       {/* Thread list */}
@@ -154,8 +194,7 @@ export function ChatPage() {
             type="button"
             variant="secondary"
             className="gap-1.5 px-3 py-2 text-xs"
-            loading={createMutation.isPending}
-            onClick={() => createMutation.mutate()}
+            onClick={startDraftNewChat}
           >
             <MessageSquarePlus className="h-4 w-4" />
             New
@@ -193,7 +232,7 @@ export function ChatPage() {
                     <div
                       className={cn(
                         'group flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition-colors',
-                        validSelectedId === t.id
+                        validSelectedId === t.id && !isDraftNewChat
                           ? 'bg-mist-100 font-medium text-brand-700'
                           : 'hover:bg-mist-50',
                       )}
@@ -247,18 +286,24 @@ export function ChatPage() {
       </aside>
 
       {/* Conversation */}
-      <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-mist-200 bg-white shadow-sm">
-        {validSelectedId == null ? (
+      <section className="flex min-h-[320px] flex-1 flex-col overflow-hidden rounded-2xl border border-mist-200 bg-white shadow-sm">
+        {validSelectedId == null && !isDraftNewChat ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
             <p className="text-sm text-ink-800/80">Select a chat or start a new one.</p>
-            <Button
-              type="button"
-              loading={createMutation.isPending}
-              onClick={() => createMutation.mutate()}
-            >
+            <Button type="button" onClick={startDraftNewChat}>
               New chat
             </Button>
           </div>
+        ) : isDraftNewChat ? (
+          <DraftNewChatLayout
+            greetName={greetName}
+            draft={draft}
+            setDraft={setDraft}
+            buildId={buildId}
+            setBuildId={setBuildId}
+            builds={buildsQuery.data ?? []}
+            sendMutation={sendMutation}
+          />
         ) : (
           <>
             <div className="border-b border-mist-100 px-4 py-3">
@@ -266,7 +311,6 @@ export function ChatPage() {
                 {threads.find((x) => x.id === validSelectedId)?.thread_name?.trim() ||
                   `Chat ${validSelectedId}`}
               </h1>
-              <p className="text-xs text-ink-800/60">Assistant replies are generated on the server.</p>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -322,47 +366,15 @@ export function ChatPage() {
               )}
             </div>
 
-            <div className="border-t border-mist-100 p-4">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <label className="text-xs font-medium text-ink-800">Attach build (optional)</label>
-                <select
-                  value={buildId === '' ? '' : String(buildId)}
-                  onChange={(e) =>
-                    setBuildId(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                  className="rounded-lg border border-mist-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/30"
-                >
-                  <option value="">None</option>
-                  {(buildsQuery.data ?? []).map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.build_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Ask about your build, parts, or compatibility…"
-                  rows={3}
-                  maxLength={32000}
-                  className="min-h-[88px] flex-1 resize-y rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-ink-950 shadow-sm placeholder:text-ink-800/40 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/30"
-                />
-                <Button
-                  type="button"
-                  className="self-end px-4"
-                  loading={sendMutation.isPending}
-                  disabled={!draft.trim()}
-                  onClick={() => sendMutation.mutate()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="mt-2 text-[10px] text-ink-800/50">
-                {draft.length.toLocaleString()} / 32,000 characters
-              </p>
-            </div>
+            <ChatComposer
+              draft={draft}
+              setDraft={setDraft}
+              buildId={buildId}
+              setBuildId={setBuildId}
+              builds={buildsQuery.data ?? []}
+              sendMutation={sendMutation}
+              variant="thread"
+            />
           </>
         )}
       </section>
@@ -380,6 +392,169 @@ export function ChatPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+function DraftNewChatLayout({
+  greetName,
+  draft,
+  setDraft,
+  buildId,
+  setBuildId,
+  builds,
+  sendMutation,
+}: {
+  greetName: string
+  draft: string
+  setDraft: (v: string) => void
+  buildId: number | ''
+  setBuildId: (v: number | '') => void
+  builds: BuildSummary[]
+  sendMutation: { isPending: boolean; mutate: () => void }
+}) {
+  const showName = greetName !== 'there'
+  const quickPrompts = [
+    'Help me pick parts for a $1,200 gaming PC',
+    'Is my PSU wattage enough for this build?',
+    'Explain the difference between two similar GPUs',
+  ]
+
+  return (
+    <div className="flex min-h-[min(520px,calc(100dvh-14rem))] flex-1 flex-col bg-gradient-to-b from-mist-50/90 via-white to-white">
+      <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8 pt-10 sm:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="flex w-full max-w-3xl flex-col items-center text-center"
+        >
+          <div className="mb-3 flex items-center justify-center gap-2 text-brand-600">
+            <Sparkles className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.5} aria-hidden />
+          </div>
+          <h2 className="max-w-xl text-balance font-serif text-3xl font-semibold tracking-tight text-ink-950 sm:text-4xl">
+            {showName ? (
+              <>
+                Hi <span className="text-brand-700">{greetName}</span>! How can I help?
+              </>
+            ) : (
+              "What's on the agenda today?"
+            )}
+          </h2>
+          <div className="mt-12 w-full">
+            <ChatComposer
+              draft={draft}
+              setDraft={setDraft}
+              buildId={buildId}
+              setBuildId={setBuildId}
+              builds={builds}
+              sendMutation={sendMutation}
+              variant="draft"
+            />
+          </div>
+
+          <div className="mt-6 flex max-w-2xl flex-wrap items-center justify-center gap-2">
+            {quickPrompts.map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setDraft(label)}
+                className="rounded-full border border-mist-200 bg-white/90 px-3 py-1.5 text-left text-xs font-medium text-ink-800 shadow-sm transition hover:border-mist-300 hover:bg-mist-50 sm:text-sm"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+function ChatComposer({
+  draft,
+  setDraft,
+  buildId,
+  setBuildId,
+  builds,
+  sendMutation,
+  variant,
+}: {
+  draft: string
+  setDraft: (v: string) => void
+  buildId: number | ''
+  setBuildId: (v: number | '') => void
+  builds: BuildSummary[]
+  sendMutation: { isPending: boolean; mutate: () => void }
+  variant: 'draft' | 'thread'
+}) {
+  const isDraft = variant === 'draft'
+
+  return (
+    <div
+      className={cn(
+        isDraft ? '' : 'border-t border-mist-100 bg-white/80 p-4 backdrop-blur-sm',
+      )}
+    >
+      <div className={cn('mb-3 flex flex-wrap items-center gap-2', isDraft && 'justify-center')}>
+        <label className="text-xs font-medium text-ink-800/80">Attach build</label>
+        <select
+          value={buildId === '' ? '' : String(buildId)}
+          onChange={(e) => setBuildId(e.target.value === '' ? '' : Number(e.target.value))}
+          className="max-w-[min(100%,280px)] rounded-full border border-mist-200 bg-white px-3 py-1.5 text-xs shadow-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/25 sm:text-sm"
+        >
+          <option value="">None</option>
+          {builds.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.build_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div
+        className={cn(
+          'flex gap-2',
+          isDraft &&
+            'rounded-[1.75rem] border border-mist-200 bg-white p-2 pl-4 shadow-lg shadow-mist-200/40 ring-1 ring-black/[0.03]',
+        )}
+      >
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="How can I help you today?"
+          rows={isDraft ? 1 : 3}
+          maxLength={32000}
+          className={cn(
+            'min-h-0 flex-1 resize-none bg-transparent text-ink-950 placeholder:text-ink-800/45 focus:outline-none',
+            isDraft
+              ? 'max-h-[200px] min-h-[52px] py-3.5 text-base leading-relaxed sm:min-h-[56px] sm:py-4 sm:text-[17px]'
+              : 'min-h-[88px] resize-y rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-400/30',
+          )}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              if (draft.trim() && !sendMutation.isPending) sendMutation.mutate()
+            }
+          }}
+        />
+        <Button
+          type="button"
+          className={cn(
+            'shrink-0',
+            isDraft ? 'h-11 w-11 self-end rounded-full p-0 sm:h-12 sm:w-12' : 'self-end px-4',
+          )}
+          loading={sendMutation.isPending}
+          disabled={!draft.trim()}
+          onClick={() => sendMutation.mutate()}
+          aria-label="Send message"
+        >
+          <Send className={cn('h-4 w-4', isDraft && 'sm:h-[18px] sm:w-[18px]')} />
+        </Button>
+      </div>
+      <p className={cn('mt-2 text-[10px] text-ink-800/45', isDraft && 'text-center')}>
+        {draft.length.toLocaleString()} / 32,000 · Shift+Enter for new line
+      </p>
     </div>
   )
 }
