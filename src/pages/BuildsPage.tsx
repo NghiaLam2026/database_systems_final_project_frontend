@@ -6,6 +6,7 @@ import { Plus, Copy, Trash2, Pencil, Cpu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api/client'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
 import { TextField } from '@/components/ui/TextField'
 import {
@@ -134,11 +135,20 @@ export function BuildsPage() {
         token={token}
       />
 
-      <DeleteConfirmModal
-        build={deleteTarget}
-        loading={deleteMutation.isPending}
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      <ConfirmDialog
+        open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
+        title="Delete build?"
+        description={
+          <>
+            Are you sure you want to delete <strong>{deleteTarget?.build_name}</strong>? This
+            action cannot be undone.
+          </>
+        }
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id)
+        }}
       />
     </div>
   )
@@ -424,41 +434,6 @@ function EditBuildModal({
             </Button>
           </div>
         </form>
-      </div>
-    </Modal>
-  )
-}
-
-function DeleteConfirmModal({
-  build,
-  loading,
-  onConfirm,
-  onClose,
-}: {
-  build: BuildSummary | null
-  loading: boolean
-  onConfirm: () => void
-  onClose: () => void
-}) {
-  return (
-    <Modal open={build !== null} title="Delete Build" onClose={onClose}>
-      <div className="p-7">
-        <h2 className="text-lg font-semibold text-ink-950">Delete build?</h2>
-        <p className="mt-2 text-sm text-ink-800">
-          Are you sure you want to delete <strong>{build?.build_name}</strong>? This
-          action cannot be undone.
-        </p>
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button
-            variant="primary"
-            loading={loading}
-            onClick={onConfirm}
-            className="bg-red-600 hover:bg-red-500"
-          >
-            Delete
-          </Button>
-        </div>
       </div>
     </Modal>
   )

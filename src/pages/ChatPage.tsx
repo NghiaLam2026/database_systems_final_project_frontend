@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils/cn'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
 import { TextField } from '@/components/ui/TextField'
 import { listBuilds } from '@/features/builds/builds.api'
@@ -27,8 +28,19 @@ import {
   postMessage,
 } from '@/features/chat/chat.api'
 import type { ThreadListItem } from '@/features/chat/chat.types'
+import { deriveThreadTitle } from '@/features/chat/threadTitle'
+import { AiMarkdown } from '@/components/chat/AiMarkdown'
 
 const THREADS_PAGE_SIZE = 50
+
+const AI_STATUS_MESSAGES = [
+  'Calling API…',
+  'Sending your message…',
+  'Waiting for the assistant…',
+  'Retrieving response from the AI…',
+] as const
+
+type SendPayload = { user_request: string; build_id?: number }
 
 export function ChatPage() {
   const { state } = useAuth()
@@ -44,10 +56,17 @@ export function ChatPage() {
   const [renameValue, setRenameValue] = useState('')
   const [renameTargetId, setRenameTargetId] = useState<number | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null)
+  const [deleteThreadId, setDeleteThreadId] = useState<number | null>(null)
   /** With no `?thread=`, start in new-chat draft; "New" sets this true; picking a thread clears it. */
   const [wantsNewChatDraft, setWantsNewChatDraft] = useState(() => threadParam == null)
   const isDraftNewChat = wantsNewChatDraft && validSelectedId == null
   const endRef = useRef<HTMLDivElement>(null)
+  /** Shown after submit until the server responds (user bubble + loading assistant). */
+  const [optimisticSend, setOptimisticSend] = useState<{
+    userText: string
+    buildId?: number
+  } | null>(null)
+  const [statusTick, setStatusTick] = useState(0)
 
   const threadsQuery = useQuery({
     queryKey: ['threads', THREADS_PAGE_SIZE],
@@ -71,7 +90,7 @@ export function ChatPage() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [validSelectedId, messagesQuery.dataUpdatedAt])
+  }, [validSelectedId, messagesQuery.dataUpdatedAt, optimisticSend, statusTick])
 
   const invalidateThreads = useCallback(() => {
     void qc.invalidateQueries({ queryKey: ['threads'] })
@@ -85,19 +104,22 @@ export function ChatPage() {
   }, [setSearchParams])
 
   const sendMutation = useMutation({
-    mutationFn: async (): Promise<{ threadId: number; mode: 'new' | 'existing' }> => {
-      const body = {
-        user_request: draft.trim(),
-        ...(buildId !== '' ? { build_id: buildId } : {}),
-      }
+    mutationFn: async (payload: SendPayload): Promise<{ threadId: number; mode: 'new' | 'existing' }> => {
       if (validSelectedId != null) {
-        await postMessage(token, validSelectedId, body)
+        await postMessage(token, validSelectedId, payload)
         return { threadId: validSelectedId, mode: 'existing' }
       }
       if (isDraftNewChat) {
         const thread = await createThread(token, {})
         try {
-          await postMessage(token, thread.id, body)
+          try {
+            await patchThread(token, thread.id, {
+              thread_name: deriveThreadTitle(payload.user_request),
+            })
+          } catch {
+            /* title is best-effort */
+          }
+          await postMessage(token, thread.id, payload)
           return { threadId: thread.id, mode: 'new' }
         } catch (e) {
           try {
@@ -111,6 +133,7 @@ export function ChatPage() {
       throw new Error('No chat selected')
     },
     onSuccess: (result) => {
+      setOptimisticSend(null)
       setDraft('')
       if (result.mode === 'new') {
         setWantsNewChatDraft(false)
@@ -119,11 +142,41 @@ export function ChatPage() {
       void qc.invalidateQueries({ queryKey: ['messages', 'all', result.threadId] })
       invalidateThreads()
     },
+    onError: (_err, variables) => {
+      setOptimisticSend(null)
+      if (variables) setDraft(variables.user_request)
+    },
   })
+
+  const pendingAssistant = Boolean(optimisticSend && sendMutation.isPending)
+  useEffect(() => {
+    if (!pendingAssistant) return
+    const id = window.setInterval(() => setStatusTick((t) => t + 1), 2200)
+    return () => window.clearInterval(id)
+  }, [pendingAssistant])
+
+  const statusLine = AI_STATUS_MESSAGES[statusTick % AI_STATUS_MESSAGES.length]
+
+  const submitSend = useCallback(() => {
+    const text = draft.trim()
+    if (!text || sendMutation.isPending) return
+    const payload: SendPayload = {
+      user_request: text,
+      ...(buildId !== '' ? { build_id: Number(buildId) } : {}),
+    }
+    setStatusTick(0)
+    setOptimisticSend({
+      userText: text,
+      buildId: buildId === '' ? undefined : Number(buildId),
+    })
+    setDraft('')
+    sendMutation.mutate(payload)
+  }, [draft, buildId, sendMutation])
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteThread(token, id),
     onSuccess: (_, deletedId) => {
+      setDeleteThreadId(null)
       invalidateThreads()
       void qc.invalidateQueries({ queryKey: ['messages'] })
       if (validSelectedId === deletedId) {
@@ -161,8 +214,7 @@ export function ChatPage() {
   }
 
   const confirmDelete = (id: number) => {
-    if (!window.confirm('Delete this chat and all its messages?')) return
-    deleteMutation.mutate(id)
+    setDeleteThreadId(id)
     setMenuOpenId(null)
   }
 
@@ -302,7 +354,10 @@ export function ChatPage() {
             buildId={buildId}
             setBuildId={setBuildId}
             builds={buildsQuery.data ?? []}
-            sendMutation={sendMutation}
+            isSending={sendMutation.isPending}
+            optimisticSend={optimisticSend}
+            statusLine={statusLine}
+            onSend={submitSend}
           />
         ) : (
           <>
@@ -348,17 +403,45 @@ export function ChatPage() {
                             </div>
                           </div>
                           <div className="flex justify-start">
-                            <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-mist-200 bg-mist-50 px-4 py-2.5 text-sm text-ink-900">
-                              <p className="whitespace-pre-wrap break-words leading-relaxed">
-                                {m.ai_response}
-                              </p>
-                              <p className="mt-2 text-[10px] text-ink-800/50">
+                            <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-mist-200 bg-mist-50 px-4 py-3 text-ink-900 shadow-sm">
+                              <AiMarkdown content={m.ai_response} />
+                              <p className="mt-3 text-[10px] text-ink-800/50">
                                 {formatTime(m.created_at)}
                               </p>
                             </div>
                           </div>
                         </motion.div>
                       ))}
+                      {optimisticSend && sendMutation.isPending ? (
+                        <motion.div
+                          key="optimistic"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex flex-col gap-2"
+                        >
+                          <div className="flex justify-end">
+                            <div className="max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-4 py-2.5 text-sm text-white shadow-sm">
+                              <p className="whitespace-pre-wrap break-words">{optimisticSend.userText}</p>
+                              {optimisticSend.buildId != null ? (
+                                <p className="mt-1 text-[10px] font-medium text-white/80">
+                                  Build #{optimisticSend.buildId}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex justify-start">
+                            <div className="flex max-w-[90%] items-start gap-3 rounded-2xl rounded-bl-md border border-dashed border-mist-300 bg-mist-50/80 px-4 py-3 text-sm text-ink-800">
+                              <span
+                                className="mt-0.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-brand-500"
+                                aria-hidden
+                              />
+                              <div>
+                                <p className="font-medium text-ink-900">{statusLine}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : null}
                     </AnimatePresence>
                   </div>
                   <div ref={endRef} />
@@ -372,7 +455,8 @@ export function ChatPage() {
               buildId={buildId}
               setBuildId={setBuildId}
               builds={buildsQuery.data ?? []}
-              sendMutation={sendMutation}
+              isPending={sendMutation.isPending}
+              onSend={submitSend}
               variant="thread"
             />
           </>
@@ -392,6 +476,18 @@ export function ChatPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteThreadId !== null}
+        onClose={() => setDeleteThreadId(null)}
+        title="Delete chat?"
+        description="This will remove this chat and all of its messages. This action cannot be undone."
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteThreadId == null) return
+          deleteMutation.mutate(deleteThreadId)
+        }}
+      />
     </div>
   )
 }
@@ -403,7 +499,10 @@ function DraftNewChatLayout({
   buildId,
   setBuildId,
   builds,
-  sendMutation,
+  isSending,
+  optimisticSend,
+  statusLine,
+  onSend,
 }: {
   greetName: string
   draft: string
@@ -411,7 +510,10 @@ function DraftNewChatLayout({
   buildId: number | ''
   setBuildId: (v: number | '') => void
   builds: BuildSummary[]
-  sendMutation: { isPending: boolean; mutate: () => void }
+  isSending: boolean
+  optimisticSend: { userText: string; buildId?: number } | null
+  statusLine: string
+  onSend: () => void
 }) {
   const showName = greetName !== 'there'
   const quickPrompts = [
@@ -441,6 +543,30 @@ function DraftNewChatLayout({
               "What's on the agenda today?"
             )}
           </h2>
+          {optimisticSend && isSending ? (
+            <div className="mt-10 w-full max-w-3xl space-y-3 text-left">
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-4 py-2.5 text-sm text-white shadow-sm">
+                  <p className="whitespace-pre-wrap break-words">{optimisticSend.userText}</p>
+                  {optimisticSend.buildId != null ? (
+                    <p className="mt-1 text-[10px] font-medium text-white/80">
+                      Build #{optimisticSend.buildId}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="flex max-w-[90%] items-start gap-3 rounded-2xl rounded-bl-md border border-dashed border-mist-300 bg-white px-4 py-3 text-sm shadow-sm">
+                  <span
+                    className="mt-0.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-brand-500"
+                    aria-hidden
+                  />
+                  <p className="font-medium text-ink-900">{statusLine}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-12 w-full">
             <ChatComposer
               draft={draft}
@@ -448,23 +574,26 @@ function DraftNewChatLayout({
               buildId={buildId}
               setBuildId={setBuildId}
               builds={builds}
-              sendMutation={sendMutation}
+              isPending={isSending}
+              onSend={onSend}
               variant="draft"
             />
           </div>
 
-          <div className="mt-6 flex max-w-2xl flex-wrap items-center justify-center gap-2">
-            {quickPrompts.map((label) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setDraft(label)}
-                className="rounded-full border border-mist-200 bg-white/90 px-3 py-1.5 text-left text-xs font-medium text-ink-800 shadow-sm transition hover:border-mist-300 hover:bg-mist-50 sm:text-sm"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {!isSending ? (
+            <div className="mt-6 flex max-w-2xl flex-wrap items-center justify-center gap-2">
+              {quickPrompts.map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setDraft(label)}
+                  className="rounded-full border border-mist-200 bg-white/90 px-3 py-1.5 text-left text-xs font-medium text-ink-800 shadow-sm transition hover:border-mist-300 hover:bg-mist-50 sm:text-sm"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </motion.div>
       </div>
     </div>
@@ -477,7 +606,8 @@ function ChatComposer({
   buildId,
   setBuildId,
   builds,
-  sendMutation,
+  isPending,
+  onSend,
   variant,
 }: {
   draft: string
@@ -485,7 +615,8 @@ function ChatComposer({
   buildId: number | ''
   setBuildId: (v: number | '') => void
   builds: BuildSummary[]
-  sendMutation: { isPending: boolean; mutate: () => void }
+  isPending: boolean
+  onSend: () => void
   variant: 'draft' | 'thread'
 }) {
   const isDraft = variant === 'draft'
@@ -534,9 +665,10 @@ function ChatComposer({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              if (draft.trim() && !sendMutation.isPending) sendMutation.mutate()
+              if (draft.trim() && !isPending) onSend()
             }
           }}
+          disabled={isPending}
         />
         <Button
           type="button"
@@ -544,9 +676,9 @@ function ChatComposer({
             'shrink-0',
             isDraft ? 'h-11 w-11 self-end rounded-full p-0 sm:h-12 sm:w-12' : 'self-end px-4',
           )}
-          loading={sendMutation.isPending}
-          disabled={!draft.trim()}
-          onClick={() => sendMutation.mutate()}
+          loading={isPending}
+          disabled={!draft.trim() || isPending}
+          onClick={onSend}
           aria-label="Send message"
         >
           <Send className={cn('h-4 w-4', isDraft && 'sm:h-[18px] sm:w-[18px]')} />
